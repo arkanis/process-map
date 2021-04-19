@@ -1,0 +1,5 @@
+map
+demo.*
+deps/include
+deps/lib
+deps/*.tar.gz

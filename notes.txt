@@ -1,0 +1,109 @@
+# Ideas
+
+- Rename pages and pixels to rangeTiles and symbolTiles
+- Document sources of hilbert curve and fnv1a code
+
+x Add UI to list and toggle tasks
+x Read task name from /proc/PID/task/TID/comm
+x Draw task samples
+x Give each task a different color. So we can identify it by its trail.
+x Upload each sample to the particle system
+x Create particle systems for tasks
+x Add functions to collect task samples
+x Add range information UI at the top of the window
+x Fix free space distribution
+x Resizable window
+x Add map legend with: Color scheme (add hint: unmapped areas not to scale), Page size comparison
+x Add informative color scheme: unmapped as light gray, anonymous as gray
+x Change symbol map color layout from RGBA to just A (one color channel)? → Not needed
+x Change map color layout: RGB for normal color, A for index (we only need to avoid the same color for adjacent ranges).
+  This gets rid of all that color calculation trickery.
+x Cleanup ELF symbol range code
+	x Make range labels use label struct
+	x Fixe text layout calculation
+	x Make it an extra function so we can reuse it for range and symbol layouts?
+	x Extra function for range symbols?
+x Make a text bounding box experiment (is text pos top left corner or base line pos?)
+x Clean up raylib experiments
+x Add symbols for ELF ranges
+x Use 2 color channels to differentiate the maps (e.g. with an index), the other 2 channels to define hue and other hsl parameters?
+  That way we use the same color for all maps of the same file but still get borders between them.
+x Determine region colors from their pathnames. Then all regions of the same file would have the same color.
+x Round range starts to power to two to avoid jagged edges / transitions between regions.
+  Probably only needed for transitions from an unmapped area to a mapped area.
+x Distribute space of unmapped regions to fill the entire quad of the map.
+x Use exported ELF function symbol addresses instead of debug symbols.
+  The address is the start of the symbol area, it continues up to the next symbol (or the end of the mapped area).
+  ELF has a proper symbol size, use it instead.
+x Experiment: Draw a point cloud with raylib
+x Cleanup rlgl.h patch into extra file and update Makefile
+x Cleanup project directories
+
+
+# The plan for the raylib version
+
+- Generate regions in C
+	- Calc bounding box per region
+	- Get basename and color for region (color = basename → fvna1 hash → take bits for some hsl stuff)
+	- Calc text position (bounding box center) per region
+- Draw map
+	- Map texture
+	- Iterate over all regions and draw the text if the bounding box is visible
+- Load symbols from ELF files
+	- Create another texture with 4x the resolution
+	- Map symbol start and end addresses to map ranges
+	- Draw symbol into map, increment color, only draw the borders (we only need the color to differentiate symbols)
+	- Calculate bounding boxes for symbols and position text within them (properly scaled down to fit inside)
+- Collect task samples and draw trails?
+	- Experiment: Draw a point cloud with raylib
+	- Also handle task exit and spawn?
+- UI to view and select tasks
+
+
+# Notes
+
+- Inspired by Map of the Internet: https://xkcd.com/195/
+	- The 1D to 2D mapping is a Hilbert Curve: https://blog.xkcd.com/2006/12/11/the-map-of-the-internet/
+- Introduction and nice visualizations of Hilbert Curves:
+	- Wikipedia (C code returns 0 in C++): https://en.wikipedia.org/wiki/Hilbert_curve
+	- Making 2D Hilbert Curve: https://www.bioconductor.org/packages/devel/bioc/vignettes/HilbertCurve/inst/doc/HilbertCurve.html
+	- Portrait of the Hilbert curve: https://corte.si/posts/code/hilbert/portrait/index.html
+	- Original paper for code of "Portrait of the Hilbert curve":
+	  R. Niedermeier , K. Reinhardt and P. Sanders . Towards optimal locality in mesh-indexings. Technical Report Universität Karlsruhe, Fakultät für Informatik, IB 12/97, September 1997. Revised and expanded version of the FCT'97 paper. [dvi pdf] 
+	  https://web.archive.org/web/20100326192134/http://www2-fs.informatik.uni-tuebingen.de/~reinhard/curr.html#NRS97a
+	- Hilbert Curve - Concepts & Implementation: https://www.fundza.com/algorithmic/space_filling/hilbert/basics/index.html
+	  Maybe a good start for a deeper understanding of the curve.
+- Code to map distances to pixels and the other way around:
+	- Compact JavaScript implementation: https://github.com/w8r/hilbert/blob/master/hilbert.js
+	- Itself based on a Go-implementation: https://github.com/google/hilbert/blob/master/hilbert.go
+	  That seems to actually work :)
+- Reading the DWARF debug symbols:
+	- How to actually install debug symbols for other packages on Linux Mint / Ubuntu / Debian:
+		- How to install debug symbols for installed packages?: https://askubuntu.com/questions/487222/how-to-install-debug-symbols-for-installed-packages
+		- Debug Symbol Packages: https://wiki.ubuntu.com/Debug%20Symbol%20Packages
+	- How to lookup the debug symbol file for a given binary / library: https://sourceware.org/gdb/onlinedocs/gdb/Separate-Debug-Files.html
+	  Explains how gdb does it ("Debugging Information in Separate Files"), including the exact algorithm. :)
+	- How to get the instruction pointer from a thread / task:
+		- First read it from /proc/[pid]/stat, value 30 kstkeip. But was 0 all the time, probably because the process wasn't privileged.
+		- Via ptrace:https://stackoverflow.com/questions/1357594/get-instruction-pointer-of-running-application-on-unix
+		  Understanding ptrace: https://abda.nl/posts/understanding-ptrace/
+	- Sampling Profiler Internals: Suspending Threads: https://nikhilism.com/post/2018/sampling-profiler-internals-suspending-threads/
+	  Good starting point for potential Windows support.
+	- Writing a Linux Debugger Part 1: Setup: https://blog.tartanllama.xyz/writing-a-linux-debugger-setup/
+	  Maybe worth a read, but the footnotes look actually much more useful (https://blog.tartanllama.xyz/writing-a-linux-debugger-setup/#fnref:1).
+
+
+# SDF text rendering
+
+- Can we replace length(vec2(dFdx(distance), dFdy(distance))) with fwidth()?
+- Don't need dist_per_pixel if we don't want to apply a threshold. dFdx() and dFdy() give us the change per screen space
+  pixel. We only have to get the zero-point correct if we don't want to move it around.
+
+
+# Raylib feedback
+
+- Improve SDF example
+- Add flush function
+- Add function to get model view projection matrix
+- Fix UnloadFileText() argument sign to match LoadFileText() return type
+- Write about point particle system

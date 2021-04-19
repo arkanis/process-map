@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<meta charset=utf-8>
+<title>Process maps to 2d grid experiment</title>
+<style>
+	body { font: small sans-serif; }
+</style>
+
+
+<canvas></canvas>
+<div id=tooltip style="pointer-events: none; position: absolute; left: 0; top: 0; margin: 0; padding: 0.5em; background: hsla(0, 0%, 80%, 0.75);">
+	<span class=address></span><br>
+	<span class=pathname></span>
+</div>
+<script>
+	// Source: https://stackoverflow.com/questions/2353211/hsl-to-rgb-color-conversion#answer-64090995
+	
+	// input: h in [0,360] and s,v in [0,1] - output: r,g,b in [0,1]
+	function hsl2rgb(h,s,l) 
+	{
+	  let a=s*Math.min(l,1-l);
+	  let f= (n,k=(n+h/30)%12) => l - a*Math.max(Math.min(k-3,9-k,1),-1);                 
+	  return [ f(0) * 255, f(8) * 255, f(4) * 255 ];
+	}
+	
+	
+	// Source as getRandomArbitrary(): https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Math/random
+	function rand(min, max) {
+	  return Math.random() * (max - min) + min;
+	}
+	
+	
+	// Source: https://github.com/w8r/hilbert/blob/master/hilbert.js
+	
+	// Copyright 2015 Google Inc. All Rights Reserved.
+	//
+	// Licensed under the Apache License, Version 2.0 (the "License");
+	// you may not use this file except in compliance with the License.
+	// You may obtain a copy of the License at
+	//
+	// http://www.apache.org/licenses/LICENSE-2.0
+	//
+	// Unless required by applicable law or agreed to in writing, software
+	// distributed under the License is distributed on an "AS IS" BASIS,
+	// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+	// See the License for the specific language governing permissions and
+	// limitations under the License.
+
+
+	// This code is ported from Go to JS from https://github.com/google/hilbert/
+	// Inlined rotations to eliminate function call
+
+
+	// Hilbert represents a 2D Hilbert space of order N for mapping to and from.
+
+	/**
+	 * [x, y] -> distance on a hilbert curve
+	 * @param  {Number}        bits Order of Hilbert curve
+	 * @param  {Array<Number>} p    2d-Point
+	 * @return {Number}
+	 */
+	function encode(bits, pt) {
+	  var d = 0, tmp;
+	  var x = pt[0], y = pt[1];
+	  for (var s = (1 << bits) / 2; s > 0; s /= 2) {
+	    var rx = 0, ry = 0;
+
+	    if ((x & s) > 0) rx = 1;
+	    if ((y & s) > 0) ry = 1;
+
+	    d += s * s * ((3 * rx) ^ ry);
+
+	    // inlining
+	    // hilbertRot(s, p, rx, ry)
+	    if (ry === 0) {
+	      if (rx === 1) {
+	        x = s - 1 - x;
+	        y = s - 1 - y;
+	      }
+	      tmp = x;
+	      x = y;
+	      y = tmp;
+	    }
+	    // end inline
+	  }
+	  return d;
+	}
+
+
+	/**
+	 * Hilbert curve distance -> [x, y]
+	 * @param  {Number} bits Order of Hilbert curve
+	 * @param  {Number} d    Distance
+	 * @return {Array<Number>} [x, y]
+	 */
+	function decode(bits, d) {
+	  var x = 0, y = 0, tmp;
+	  var n = 1 << bits;
+	  for (var s = 1; s < n; s *= 2) {
+	    var rx = 1 & (d / 2);
+	    var ry = 1 & (d ^ rx);
+	    // inlining
+	    // hilbertRot(s, p, rx, ry)
+	    if (ry === 0) {
+	      if (rx === 1) {
+	        x = s - 1 - x;
+	        y = s - 1 - y;
+	      }
+	      tmp = x;
+	      x = y;
+	      y = tmp;
+	    }
+	    // end inline
+
+	    x += s * rx;
+	    y += s * ry;
+	    d /= 4;
+	  }
+	  return [x, y];
+	}
+</script>
+<script>
+	const mapsStr = `
+		557788197000-5577885b0000 r-xp 00000000 08:24 925764                     /usr/bin/php7.2
+		5577887af000-557788828000 r--p 00418000 08:24 925764                     /usr/bin/php7.2
+		557788828000-557788843000 rw-p 00491000 08:24 925764                     /usr/bin/php7.2
+		557788843000-557788860000 rw-p 00000000 00:00 0 
+		55778a2a7000-55778a45f000 rw-p 00000000 00:00 0                          [heap]
+		7f1703b23000-7f1703b37000 r-xp 00000000 08:24 399147                     /lib/x86_64-linux-gnu/libgpg-error.so.0.22.0
+		7f1703b37000-7f1703d36000 ---p 00014000 08:24 399147                     /lib/x86_64-linux-gnu/libgpg-error.so.0.22.0
+		7f1703d36000-7f1703d37000 r--p 00013000 08:24 399147                     /lib/x86_64-linux-gnu/libgpg-error.so.0.22.0
+		7f1703d37000-7f1703d38000 rw-p 00014000 08:24 399147                     /lib/x86_64-linux-gnu/libgpg-error.so.0.22.0
+		7f1703d38000-7f1703e4c000 r-xp 00000000 08:24 410559                     /lib/x86_64-linux-gnu/libgcrypt.so.20.2.1
+		7f1703e4c000-7f170404c000 ---p 00114000 08:24 410559                     /lib/x86_64-linux-gnu/libgcrypt.so.20.2.1
+		7f170404c000-7f170404e000 r--p 00114000 08:24 410559                     /lib/x86_64-linux-gnu/libgcrypt.so.20.2.1
+		7f170404e000-7f1704053000 rw-p 00116000 08:24 410559                     /lib/x86_64-linux-gnu/libgcrypt.so.20.2.1
+		7f1704053000-7f1704054000 rw-p 00000000 00:00 0 
+		7f1704054000-7f1704090000 r-xp 00000000 08:24 922408                     /usr/lib/x86_64-linux-gnu/libxslt.so.1.1.29
+		7f1704090000-7f170428f000 ---p 0003c000 08:24 922408                     /usr/lib/x86_64-linux-gnu/libxslt.so.1.1.29
+		7f170428f000-7f1704290000 r--p 0003b000 08:24 922408                     /usr/lib/x86_64-linux-gnu/libxslt.so.1.1.29
+		7f1704290000-7f1704291000 rw-p 0003c000 08:24 922408                     /usr/lib/x86_64-linux-gnu/libxslt.so.1.1.29
+		7f1704291000-7f17042a5000 r-xp 00000000 08:24 922405                     /usr/lib/x86_64-linux-gnu/libexslt.so.0.8.17
+		7f17042a5000-7f17044a5000 ---p 00014000 08:24 922405                     /usr/lib/x86_64-linux-gnu/libexslt.so.0.8.17
+		7f17044a5000-7f17044a6000 r--p 00014000 08:24 922405                     /usr/lib/x86_64-linux-gnu/libexslt.so.0.8.17
+		7f17044a6000-7f17044a7000 rw-p 00015000 08:24 922405                     /usr/lib/x86_64-linux-gnu/libexslt.so.0.8.17
+		7f17044a7000-7f17044ad000 r-xp 00000000 08:24 925748                     /usr/lib/php/20170718/xsl.so
+		7f17044ad000-7f17046ad000 ---p 00006000 08:24 925748                     /usr/lib/php/20170718/xsl.so
+		7f17046ad000-7f17046ae000 r--p 00006000 08:24 925748                     /usr/lib/php/20170718/xsl.so
+		7f17046ae000-7f17046af000 rw-p 00007000 08:24 925748                     /usr/lib/php/20170718/xsl.so
+		7f17046af000-7f17046b7000 r-xp 00000000 08:24 925747                     /usr/lib/php/20170718/xmlwriter.so
+		7f17046b7000-7f17048b7000 ---p 00008000 08:24 925747                     /usr/lib/php/20170718/xmlwriter.so
+		7f17048b7000-7f17048ba000 r--p 00008000 08:24 925747                     /usr/lib/php/20170718/xmlwriter.so
+		7f17048ba000-7f17048bb000 rw-p 0000b000 08:24 925747                     /usr/lib/php/20170718/xmlwriter.so
+		7f17048bb000-7f17048c2000 r-xp 00000000 08:24 925741                     /usr/lib/php/20170718/xmlreader.so
+		7f17048c2000-7f1704ac1000 ---p 00007000 08:24 925741                     /usr/lib/php/20170718/xmlreader.so
+		7f1704ac1000-7f1704ac2000 r--p 00006000 08:24 925741                     /usr/lib/php/20170718/xmlreader.so
+		7f1704ac2000-7f1704ac3000 rw-p 00007000 08:24 925741                     /usr/lib/php/20170718/xmlreader.so
+		7f1704ac3000-7f1704aca000 r-xp 00000000 08:24 925738                     /usr/lib/php/20170718/wddx.so
+		7f1704aca000-7f1704cc9000 ---p 00007000 08:24 925738                     /usr/lib/php/20170718/wddx.so
+		7f1704cc9000-7f1704cca000 r--p 00006000 08:24 925738                     /usr/lib/php/20170718/wddx.so
+		7f1704cca000-7f1704ccb000 rw-p 00007000 08:24 925738                     /usr/lib/php/20170718/wddx.so
+		7f1704ccb000-7f1704ccf000 r-xp 00000000 08:24 925805                     /usr/lib/php/20170718/tokenizer.so
+		7f1704ccf000-7f1704ece000 ---p 00004000 08:24 925805                     /usr/lib/php/20170718/tokenizer.so
+		7f1704ece000-7f1704ecf000 r--p 00003000 08:24 925805                     /usr/lib/php/20170718/tokenizer.so
+		7f1704ecf000-7f1704ed0000 rw-p 00004000 08:24 925805                     /usr/lib/php/20170718/tokenizer.so
+		7f1704ed0000-7f1704ed3000 r-xp 00000000 08:24 925803                     /usr/lib/php/20170718/sysvshm.so
+		7f1704ed3000-7f17050d2000 ---p 00003000 08:24 925803                     /usr/lib/php/20170718/sysvshm.so
+		7f17050d2000-7f17050d3000 r--p 00002000 08:24 925803                     /usr/lib/php/20170718/sysvshm.so
+		7f17050d3000-7f17050d4000 rw-p 00003000 08:24 925803                     /usr/lib/php/20170718/sysvshm.so
+		7f17050d4000-7f17050d6000 r-xp 00000000 08:24 925801                     /usr/lib/php/20170718/sysvsem.so
+		7f17050d6000-7f17052d5000 ---p 00002000 08:24 925801                     /usr/lib/php/20170718/sysvsem.so
+		7f17052d5000-7f17052d6000 r--p 00001000 08:24 925801                     /usr/lib/php/20170718/sysvsem.so
+		7f17052d6000-7f17052d7000 rw-p 00002000 08:24 925801                     /usr/lib/php/20170718/sysvsem.so
+		7f17052d7000-7f17052da000 r-xp 00000000 08:24 925795                     /usr/lib/php/20170718/sysvmsg.so
+		7f17052da000-7f17054da000 ---p 00003000 08:24 925795                     /usr/lib/php/20170718/sysvmsg.so
+		7f17054da000-7f17054db000 r--p 00003000 08:24 925795                     /usr/lib/php/20170718/sysvmsg.so
+		7f17054db000-7f17054dc000 rw-p 00004000 08:24 925795                     /usr/lib/php/20170718/sysvmsg.so
+		7f17054dc000-7f17054ef000 r-xp 00000000 08:24 925794                     /usr/lib/php/20170718/sockets.so
+		7f17054ef000-7f17056ef000 ---p 00013000 08:24 925794                     /usr/lib/php/20170718/sockets.so
+		7f17056ef000-7f17056f1000 r--p 00013000 08:24 925794                     /usr/lib/php/20170718/sockets.so
+		7f17056f1000-7f17056f2000 rw-p 00015000 08:24 925794                     /usr/lib/php/20170718/sockets.so
+		7f17056f2000-7f17056fe000 r-xp 00000000 08:24 925737                     /usr/lib/php/20170718/simplexml.so
+		7f17056fe000-7f17058fe000 ---p 0000c000 08:24 925737                     /usr/lib/php/20170718/simplexml.so
+		7f17058fe000-7f17058ff000 r--p 0000c000 08:24 925737                     /usr/lib/php/20170718/simplexml.so
+		7f17058ff000-7f1705900000 rw-p 0000d000 08:24 925737                     /usr/lib/php/20170718/simplexml.so
+		7f1705900000-7f1705902000 r-xp 00000000 08:24 925788                     /usr/lib/php/20170718/shmop.so
+		7f1705902000-7f1705b02000 ---p 00002000 08:24 925788                     /usr/lib/php/20170718/shmop.so
+		7f1705b02000-7f1705b03000 r--p 00002000 08:24 925788                     /usr/lib/php/20170718/shmop.so
+		7f1705b03000-7f1705b04000 rw-p 00003000 08:24 925788                     /usr/lib/php/20170718/shmop.so
+		7f1705b04000-7f1705b29000 r-xp 00000000 08:24 399174                     /lib/x86_64-linux-gnu/libtinfo.so.5.9
+		7f1705b29000-7f1705d29000 ---p 00025000 08:24 399174                     /lib/x86_64-linux-gnu/libtinfo.so.5.9
+		7f1705d29000-7f1705d2d000 r--p 00025000 08:24 399174                     /lib/x86_64-linux-gnu/libtinfo.so.5.9
+		7f1705d2d000-7f1705d2e000 rw-p 00029000 08:24 399174                     /lib/x86_64-linux-gnu/libtinfo.so.5.9
+		7f1705d2e000-7f1705d5f000 r-xp 00000000 08:24 928681                     /usr/lib/x86_64-linux-gnu/libedit.so.2.0.56
+		7f1705d5f000-7f1705f5e000 ---p 00031000 08:24 928681                     /usr/lib/x86_64-linux-gnu/libedit.so.2.0.56
+		7f1705f5e000-7f1705f60000 r--p 00030000 08:24 928681                     /usr/lib/x86_64-linux-gnu/libedit.so.2.0.56
+		7f1705f60000-7f1705f61000 rw-p 00032000 08:24 928681                     /usr/lib/x86_64-linux-gnu/libedit.so.2.0.56
+		7f1705f61000-7f1705f65000 rw-p 00000000 00:00 0 
+		7f1705f65000-7f1705f6b000 r-xp 00000000 08:24 925722                     /usr/lib/php/20170718/readline.so
+		7f1705f6b000-7f170616b000 ---p 00006000 08:24 925722                     /usr/lib/php/20170718/readline.so
+		7f170616b000-7f170616c000 r--p 00006000 08:24 925722                     /usr/lib/php/20170718/readline.so
+		7f170616c000-7f170616d000 rw-p 00007000 08:24 925722                     /usr/lib/php/20170718/readline.so
+		7f170616d000-7f1706174000 r-xp 00000000 08:24 925786                     /usr/lib/php/20170718/posix.so
+		7f1706174000-7f1706374000 ---p 00007000 08:24 925786                     /usr/lib/php/20170718/posix.so
+		7f1706374000-7f1706375000 r--p 00007000 08:24 925786                     /usr/lib/php/20170718/posix.so
+		7f1706375000-7f1706376000 rw-p 00008000 08:24 925786                     /usr/lib/php/20170718/posix.so
+		7f1706376000-7f17063b6000 r-xp 00000000 08:24 925784                     /usr/lib/php/20170718/phar.so
+		7f17063b6000-7f17065b5000 ---p 00040000 08:24 925784                     /usr/lib/php/20170718/phar.so
+		7f17065b5000-7f17065b7000 r--p 0003f000 08:24 925784                     /usr/lib/php/20170718/phar.so
+		7f17065b7000-7f17065b9000 rw-p 00041000 08:24 925784                     /usr/lib/php/20170718/phar.so
+		7f17065b9000-7f17065bf000 r-xp 00000000 08:24 925714                     /usr/lib/php/20170718/pdo_mysql.so
+		7f17065bf000-7f17067be000 ---p 00006000 08:24 925714                     /usr/lib/php/20170718/pdo_mysql.so
+		7f17067be000-7f17067bf000 r--p 00005000 08:24 925714                     /usr/lib/php/20170718/pdo_mysql.so
+		7f17067bf000-7f17067c0000 rw-p 00006000 08:24 925714                     /usr/lib/php/20170718/pdo_mysql.so
+		7f17067c0000-7f17067dc000 r-xp 00000000 08:24 922410                     /usr/lib/php/20170718/mysqli.so
+		7f17067dc000-7f17069dc000 ---p 0001c000 08:24 922410                     /usr/lib/php/20170718/mysqli.so
+		7f17069dc000-7f17069e0000 r--p 0001c000 08:24 922410                     /usr/lib/php/20170718/mysqli.so
+		7f17069e0000-7f17069e1000 rw-p 00020000 08:24 922410                     /usr/lib/php/20170718/mysqli.so
+		7f17069e1000-7f17069eb000 r-xp 00000000 08:24 925720                     /usr/lib/php/20170718/json.so
+		7f17069eb000-7f1706bea000 ---p 0000a000 08:24 925720                     /usr/lib/php/20170718/json.so
+		7f1706bea000-7f1706beb000 r--p 00009000 08:24 925720                     /usr/lib/php/20170718/json.so
+		7f1706beb000-7f1706bec000 rw-p 0000a000 08:24 925720                     /usr/lib/php/20170718/json.so
+		7f1706bec000-7f1706bf5000 r-xp 00000000 08:24 925780                     /usr/lib/php/20170718/iconv.so
+		7f1706bf5000-7f1706df5000 ---p 00009000 08:24 925780                     /usr/lib/php/20170718/iconv.so
+		7f1706df5000-7f1706df6000 r--p 00009000 08:24 925780                     /usr/lib/php/20170718/iconv.so
+		7f1706df6000-7f1706df7000 rw-p 0000a000 08:24 925780                     /usr/lib/php/20170718/iconv.so
+		7f1706df7000-7f1706dfa000 r-xp 00000000 08:24 925778                     /usr/lib/php/20170718/gettext.so
+		7f1706dfa000-7f1706ff9000 ---p 00003000 08:24 925778                     /usr/lib/php/20170718/gettext.so
+		7f1706ff9000-7f1706ffa000 r--p 00002000 08:24 925778                     /usr/lib/php/20170718/gettext.so
+		7f1706ffa000-7f1706ffb000 rw-p 00003000 08:24 925778                     /usr/lib/php/20170718/gettext.so
+		7f1706ffb000-7f1707002000 r-xp 00000000 08:24 399247                     /lib/x86_64-linux-gnu/librt-2.27.so
+		7f1707002000-7f1707201000 ---p 00007000 08:24 399247                     /lib/x86_64-linux-gnu/librt-2.27.so
+		7f1707201000-7f1707202000 r--p 00006000 08:24 399247                     /lib/x86_64-linux-gnu/librt-2.27.so
+		7f1707202000-7f1707203000 rw-p 00007000 08:24 399247                     /lib/x86_64-linux-gnu/librt-2.27.so
+		7f1707203000-7f1707216000 r-xp 00000000 08:24 410553                     /lib/x86_64-linux-gnu/libbsd.so.0.8.7
+		7f1707216000-7f1707415000 ---p 00013000 08:24 410553                     /lib/x86_64-linux-gnu/libbsd.so.0.8.7
+		7f1707415000-7f1707416000 r--p 00012000 08:24 410553                     /lib/x86_64-linux-gnu/libbsd.so.0.8.7
+		7f1707416000-7f1707417000 rw-p 00013000 08:24 410553                     /lib/x86_64-linux-gnu/libbsd.so.0.8.7
+		7f1707417000-7f1707418000 rw-p 00000000 00:00 0 
+		7f1707418000-7f170741d000 r-xp 00000000 08:24 928330                     /usr/lib/x86_64-linux-gnu/libXdmcp.so.6.0.0
+		7f170741d000-7f170761c000 ---p 00005000 08:24 928330                     /usr/lib/x86_64-linux-gnu/libXdmcp.so.6.0.0
+		7f170761c000-7f170761d000 r--p 00004000 08:24 928330                     /usr/lib/x86_64-linux-gnu/libXdmcp.so.6.0.0
+		7f170761d000-7f170761e000 rw-p 00005000 08:24 928330                     /usr/lib/x86_64-linux-gnu/libXdmcp.so.6.0.0
+		7f170761e000-7f1707620000 r-xp 00000000 08:24 945386                     /usr/lib/x86_64-linux-gnu/libXau.so.6.0.0
+		7f1707620000-7f1707820000 ---p 00002000 08:24 945386                     /usr/lib/x86_64-linux-gnu/libXau.so.6.0.0
+		7f1707820000-7f1707821000 r--p 00002000 08:24 945386                     /usr/lib/x86_64-linux-gnu/libXau.so.6.0.0
+		7f1707821000-7f1707822000 rw-p 00003000 08:24 945386                     /usr/lib/x86_64-linux-gnu/libXau.so.6.0.0
+		7f1707822000-7f1707848000 r-xp 00000000 08:24 939766                     /usr/lib/x86_64-linux-gnu/libxcb.so.1.1.0
+		7f1707848000-7f1707a48000 ---p 00026000 08:24 939766                     /usr/lib/x86_64-linux-gnu/libxcb.so.1.1.0
+		7f1707a48000-7f1707a49000 r--p 00026000 08:24 939766                     /usr/lib/x86_64-linux-gnu/libxcb.so.1.1.0
+		7f1707a49000-7f1707a4a000 rw-p 00027000 08:24 939766                     /usr/lib/x86_64-linux-gnu/libxcb.so.1.1.0
+		7f1707a4a000-7f1707a55000 r-xp 00000000 08:24 929072                     /usr/lib/x86_64-linux-gnu/libjbig.so.0
+		7f1707a55000-7f1707c54000 ---p 0000b000 08:24 929072                     /usr/lib/x86_64-linux-gnu/libjbig.so.0
+		7f1707c54000-7f1707c55000 r--p 0000a000 08:24 929072                     /usr/lib/x86_64-linux-gnu/libjbig.so.0
+		7f1707c55000-7f1707c58000 rw-p 0000b000 08:24 929072                     /usr/lib/x86_64-linux-gnu/libjbig.so.0
+		7f1707c58000-7f1707c87000 r-xp 00000000 08:24 398642                     /lib/x86_64-linux-gnu/libexpat.so.1.6.7
+		7f1707c87000-7f1707e87000 ---p 0002f000 08:24 398642                     /lib/x86_64-linux-gnu/libexpat.so.1.6.7
+		7f1707e87000-7f1707e89000 r--p 0002f000 08:24 398642                     /lib/x86_64-linux-gnu/libexpat.so.1.6.7
+		7f1707e89000-7f1707e8a000 rw-p 00031000 08:24 398642                     /lib/x86_64-linux-gnu/libexpat.so.1.6.7
+		7f1707e8a000-7f1707fbd000 r-xp 00000000 08:24 924642                     /usr/lib/x86_64-linux-gnu/libX11.so.6.3.0
+		7f1707fbd000-7f17081bd000 ---p 00133000 08:24 924642                     /usr/lib/x86_64-linux-gnu/libX11.so.6.3.0
+		7f17081bd000-7f17081be000 r--p 00133000 08:24 924642                     /usr/lib/x86_64-linux-gnu/libX11.so.6.3.0
+		7f17081be000-7f17081c2000 rw-p 00134000 08:24 924642                     /usr/lib/x86_64-linux-gnu/libX11.so.6.3.0
+		7f17081c2000-7f1708228000 r-xp 00000000 08:24 929639                     /usr/lib/x86_64-linux-gnu/libwebp.so.6.0.2
+		7f1708228000-7f1708427000 ---p 00066000 08:24 929639                     /usr/lib/x86_64-linux-gnu/libwebp.so.6.0.2
+		7f1708427000-7f1708428000 r--p 00065000 08:24 929639                     /usr/lib/x86_64-linux-gnu/libwebp.so.6.0.2
+		7f1708428000-7f1708429000 rw-p 00066000 08:24 929639                     /usr/lib/x86_64-linux-gnu/libwebp.so.6.0.2
+		7f1708429000-7f170842b000 rw-p 00000000 00:00 0 
+		7f170842b000-7f170849e000 r-xp 00000000 08:24 920354                     /usr/lib/x86_64-linux-gnu/libtiff.so.5.3.0
+		7f170849e000-7f170869d000 ---p 00073000 08:24 920354                     /usr/lib/x86_64-linux-gnu/libtiff.so.5.3.0
+		7f170869d000-7f17086a1000 r--p 00072000 08:24 920354                     /usr/lib/x86_64-linux-gnu/libtiff.so.5.3.0
+		7f17086a1000-7f17086a2000 rw-p 00076000 08:24 920354                     /usr/lib/x86_64-linux-gnu/libtiff.so.5.3.0
+		7f17086a2000-7f1708709000 r-xp 00000000 08:24 919409                     /usr/lib/x86_64-linux-gnu/libjpeg.so.8.1.2
+		7f1708709000-7f1708908000 ---p 00067000 08:24 919409                     /usr/lib/x86_64-linux-gnu/libjpeg.so.8.1.2
+		7f1708908000-7f1708909000 r--p 00066000 08:24 919409                     /usr/lib/x86_64-linux-gnu/libjpeg.so.8.1.2
+		7f1708909000-7f170890a000 rw-p 00067000 08:24 919409                     /usr/lib/x86_64-linux-gnu/libjpeg.so.8.1.2
+		7f170890a000-7f17089b7000 r-xp 00000000 08:24 935206                     /usr/lib/x86_64-linux-gnu/libfreetype.so.6.15.0
+		7f17089b7000-7f1708bb6000 ---p 000ad000 08:24 935206                     /usr/lib/x86_64-linux-gnu/libfreetype.so.6.15.0
+		7f1708bb6000-7f1708bbd000 r--p 000ac000 08:24 935206                     /usr/lib/x86_64-linux-gnu/libfreetype.so.6.15.0
+		7f1708bbd000-7f1708bbe000 rw-p 000b3000 08:24 935206                     /usr/lib/x86_64-linux-gnu/libfreetype.so.6.15.0
+		7f1708bbe000-7f1708bfc000 r-xp 00000000 08:24 928738                     /usr/lib/x86_64-linux-gnu/libfontconfig.so.1.10.1
+		7f1708bfc000-7f1708dfc000 ---p 0003e000 08:24 928738                     /usr/lib/x86_64-linux-gnu/libfontconfig.so.1.10.1
+		7f1708dfc000-7f1708dfe000 r--p 0003e000 08:24 928738                     /usr/lib/x86_64-linux-gnu/libfontconfig.so.1.10.1
+		7f1708dfe000-7f1708e03000 rw-p 00040000 08:24 928738                     /usr/lib/x86_64-linux-gnu/libfontconfig.so.1.10.1
+		7f1708e03000-7f1708e34000 r-xp 00000000 08:24 920318                     /usr/lib/x86_64-linux-gnu/libpng16.so.16.34.0
+		7f1708e34000-7f1709033000 ---p 00031000 08:24 920318                     /usr/lib/x86_64-linux-gnu/libpng16.so.16.34.0
+		7f1709033000-7f1709034000 r--p 00030000 08:24 920318                     /usr/lib/x86_64-linux-gnu/libpng16.so.16.34.0
+		7f1709034000-7f1709035000 rw-p 00031000 08:24 920318                     /usr/lib/x86_64-linux-gnu/libpng16.so.16.34.0
+		7f1709035000-7f1709046000 r-xp 00000000 08:24 928348                     /usr/lib/x86_64-linux-gnu/libXpm.so.4.11.0
+		7f1709046000-7f1709245000 ---p 00011000 08:24 928348                     /usr/lib/x86_64-linux-gnu/libXpm.so.4.11.0
+		7f1709245000-7f1709246000 r--p 00010000 08:24 928348                     /usr/lib/x86_64-linux-gnu/libXpm.so.4.11.0
+		7f1709246000-7f1709247000 rw-p 00011000 08:24 928348                     /usr/lib/x86_64-linux-gnu/libXpm.so.4.11.0
+		7f1709247000-7f1709286000 r-xp 00000000 08:24 925756                     /usr/lib/x86_64-linux-gnu/libgd.so.3.0.5
+		7f1709286000-7f1709485000 ---p 0003f000 08:24 925756                     /usr/lib/x86_64-linux-gnu/libgd.so.3.0.5
+		7f1709485000-7f170948b000 r--p 0003e000 08:24 925756                     /usr/lib/x86_64-linux-gnu/libgd.so.3.0.5
+		7f170948b000-7f17094aa000 rw-p 00044000 08:24 925756                     /usr/lib/x86_64-linux-gnu/libgd.so.3.0.5
+		7f17094aa000-7f17094ae000 rw-p 00000000 00:00 0 
+		7f17094ae000-7f17094c2000 r-xp 00000000 08:24 922951                     /usr/lib/php/20170718/gd.so
+		7f17094c2000-7f17096c2000 ---p 00014000 08:24 922951                     /usr/lib/php/20170718/gd.so
+		7f17096c2000-7f17096c7000 r--p 00014000 08:24 922951                     /usr/lib/php/20170718/gd.so
+		7f17096c7000-7f17096c8000 rw-p 00019000 08:24 922951                     /usr/lib/php/20170718/gd.so
+		7f17096c8000-7f17096d4000 r-xp 00000000 08:24 925776                     /usr/lib/php/20170718/ftp.so
+		7f17096d4000-7f17098d4000 ---p 0000c000 08:24 925776                     /usr/lib/php/20170718/ftp.so
+		7f17098d4000-7f17098d6000 r--p 0000c000 08:24 925776                     /usr/lib/php/20170718/ftp.so
+		7f17098d6000-7f17098d7000 rw-p 0000e000 08:24 925776                     /usr/lib/php/20170718/ftp.so
+		7f17098d7000-7f1709da5000 r-xp 00000000 08:24 925774                     /usr/lib/php/20170718/fileinfo.so
+		7f1709da5000-7f1709fa5000 ---p 004ce000 08:24 925774                     /usr/lib/php/20170718/fileinfo.so
+		7f1709fa5000-7f1709fa6000 r--p 004ce000 08:24 925774                     /usr/lib/php/20170718/fileinfo.so
+		7f1709fa6000-7f1709fa7000 rw-p 004cf000 08:24 925774                     /usr/lib/php/20170718/fileinfo.so
+		7f1709fa7000-7f1709fb8000 r-xp 00000000 08:24 925772                     /usr/lib/php/20170718/exif.so
+		7f1709fb8000-7f170a1b7000 ---p 00011000 08:24 925772                     /usr/lib/php/20170718/exif.so
+		7f170a1b7000-7f170a1bb000 r--p 00010000 08:24 925772                     /usr/lib/php/20170718/exif.so
+		7f170a1bb000-7f170a1bc000 rw-p 00014000 08:24 925772                     /usr/lib/php/20170718/exif.so
+		7f170a1bc000-7f170a1e1000 r-xp 00000000 08:24 925736                     /usr/lib/php/20170718/dom.so
+		7f170a1e1000-7f170a3e1000 ---p 00025000 08:24 925736                     /usr/lib/php/20170718/dom.so
+		7f170a3e1000-7f170a3e5000 r--p 00025000 08:24 925736                     /usr/lib/php/20170718/dom.so
+		7f170a3e5000-7f170a3e6000 rw-p 00029000 08:24 925736                     /usr/lib/php/20170718/dom.so
+		7f170a3e6000-7f170a3e9000 r-xp 00000000 08:24 925770                     /usr/lib/php/20170718/ctype.so
+		7f170a3e9000-7f170a5e8000 ---p 00003000 08:24 925770                     /usr/lib/php/20170718/ctype.so
+		7f170a5e8000-7f170a5e9000 r--p 00002000 08:24 925770                     /usr/lib/php/20170718/ctype.so
+		7f170a5e9000-7f170a5ea000 rw-p 00003000 08:24 925770                     /usr/lib/php/20170718/ctype.so
+		7f170a5ea000-7f170a5f0000 r-xp 00000000 08:24 919964                     /usr/lib/php/20170718/calendar.so
+		7f170a5f0000-7f170a7f0000 ---p 00006000 08:24 919964                     /usr/lib/php/20170718/calendar.so
+		7f170a7f0000-7f170a7f1000 r--p 00006000 08:24 919964                     /usr/lib/php/20170718/calendar.so
+		7f170a7f1000-7f170a7f2000 rw-p 00007000 08:24 919964                     /usr/lib/php/20170718/calendar.so
+		7f170a7f2000-7f170a7fc000 r-xp 00000000 08:24 925740                     /usr/lib/php/20170718/xml.so
+		7f170a7fc000-7f170a9fb000 ---p 0000a000 08:24 925740                     /usr/lib/php/20170718/xml.so
+		7f170a9fb000-7f170a9fd000 r--p 00009000 08:24 925740                     /usr/lib/php/20170718/xml.so
+		7f170a9fd000-7f170a9fe000 rw-p 0000b000 08:24 925740                     /usr/lib/php/20170718/xml.so
+		7f170a9fe000-7f170aa16000 r-xp 00000000 08:24 925782                     /usr/lib/php/20170718/pdo.so
+		7f170aa16000-7f170ac16000 ---p 00018000 08:24 925782                     /usr/lib/php/20170718/pdo.so
+		7f170ac16000-7f170ac19000 r--p 00018000 08:24 925782                     /usr/lib/php/20170718/pdo.so
+		7f170ac19000-7f170ac1a000 rw-p 0001b000 08:24 925782                     /usr/lib/php/20170718/pdo.so
+		7f170ac1a000-7f170ac52000 r-xp 00000000 08:24 925713                     /usr/lib/php/20170718/mysqlnd.so
+		7f170ac52000-7f170ae52000 ---p 00038000 08:24 925713                     /usr/lib/php/20170718/mysqlnd.so
+		7f170ae52000-7f170ae57000 r--p 00038000 08:24 925713                     /usr/lib/php/20170718/mysqlnd.so
+		7f170ae57000-7f170ae58000 rw-p 0003d000 08:24 925713                     /usr/lib/php/20170718/mysqlnd.so
+		7f170ae58000-7f170ae5a000 rw-p 00000000 00:00 0 
+		7f170ae5a000-7f170aebf000 r-xp 00000000 08:24 925718                     /usr/lib/php/20170718/opcache.so
+		7f170aebf000-7f170b0bf000 ---p 00065000 08:24 925718                     /usr/lib/php/20170718/opcache.so
+		7f170b0bf000-7f170b0c6000 r--p 00065000 08:24 925718                     /usr/lib/php/20170718/opcache.so
+		7f170b0c6000-7f170b0c7000 rw-p 0006c000 08:24 925718                     /usr/lib/php/20170718/opcache.so
+		7f170b0c7000-7f170b0d0000 rw-p 00000000 00:00 0 
+		7f170b0d0000-7f170b400000 r--p 00000000 08:24 926368                     /usr/lib/locale/locale-archive
+		7f170b400000-7f170b600000 rw-p 00000000 00:00 0 
+		7f170b7f7000-7f170b80e000 r-xp 00000000 08:24 410615                     /lib/x86_64-linux-gnu/libgcc_s.so.1
+		7f170b80e000-7f170ba0d000 ---p 00017000 08:24 410615                     /lib/x86_64-linux-gnu/libgcc_s.so.1
+		7f170ba0d000-7f170ba0e000 r--p 00016000 08:24 410615                     /lib/x86_64-linux-gnu/libgcc_s.so.1
+		7f170ba0e000-7f170ba0f000 rw-p 00017000 08:24 410615                     /lib/x86_64-linux-gnu/libgcc_s.so.1
+		7f170ba0f000-7f170bb88000 r-xp 00000000 08:24 917869                     /usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.25
+		7f170bb88000-7f170bd88000 ---p 00179000 08:24 917869                     /usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.25
+		7f170bd88000-7f170bd92000 r--p 00179000 08:24 917869                     /usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.25
+		7f170bd92000-7f170bd94000 rw-p 00183000 08:24 917869                     /usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.25
+		7f170bd94000-7f170bd98000 rw-p 00000000 00:00 0 
+		7f170bd98000-7f170d740000 r-xp 00000000 08:24 920427                     /usr/lib/x86_64-linux-gnu/libicudata.so.60.2
+		7f170d740000-7f170d93f000 ---p 019a8000 08:24 920427                     /usr/lib/x86_64-linux-gnu/libicudata.so.60.2
+		7f170d93f000-7f170d940000 r--p 019a7000 08:24 920427                     /usr/lib/x86_64-linux-gnu/libicudata.so.60.2
+		7f170d940000-7f170d941000 rw-p 019a8000 08:24 920427                     /usr/lib/x86_64-linux-gnu/libicudata.so.60.2
+		7f170d941000-7f170d965000 r-xp 00000000 08:24 399166                     /lib/x86_64-linux-gnu/liblzma.so.5.2.2
+		7f170d965000-7f170db65000 ---p 00024000 08:24 399166                     /lib/x86_64-linux-gnu/liblzma.so.5.2.2
+		7f170db65000-7f170db66000 r--p 00024000 08:24 399166                     /lib/x86_64-linux-gnu/liblzma.so.5.2.2
+		7f170db66000-7f170db67000 rw-p 00025000 08:24 399166                     /lib/x86_64-linux-gnu/liblzma.so.5.2.2
+		7f170db67000-7f170dd0b000 r-xp 00000000 08:24 920432                     /usr/lib/x86_64-linux-gnu/libicuuc.so.60.2
+		7f170dd0b000-7f170df0a000 ---p 001a4000 08:24 920432                     /usr/lib/x86_64-linux-gnu/libicuuc.so.60.2
+		7f170df0a000-7f170df1d000 r--p 001a3000 08:24 920432                     /usr/lib/x86_64-linux-gnu/libicuuc.so.60.2
+		7f170df1d000-7f170df1e000 rw-p 001b6000 08:24 920432                     /usr/lib/x86_64-linux-gnu/libicuuc.so.60.2
+		7f170df1e000-7f170df1f000 rw-p 00000000 00:00 0 
+		7f170df1f000-7f170df39000 r-xp 00000000 08:24 399239                     /lib/x86_64-linux-gnu/libpthread-2.27.so
+		7f170df39000-7f170e138000 ---p 0001a000 08:24 399239                     /lib/x86_64-linux-gnu/libpthread-2.27.so
+		7f170e138000-7f170e139000 r--p 00019000 08:24 399239                     /lib/x86_64-linux-gnu/libpthread-2.27.so
+		7f170e139000-7f170e13a000 rw-p 0001a000 08:24 399239                     /lib/x86_64-linux-gnu/libpthread-2.27.so
+		7f170e13a000-7f170e13e000 rw-p 00000000 00:00 0 
+		7f170e13e000-7f170e325000 r-xp 00000000 08:24 399106                     /lib/x86_64-linux-gnu/libc-2.27.so
+		7f170e325000-7f170e525000 ---p 001e7000 08:24 399106                     /lib/x86_64-linux-gnu/libc-2.27.so
+		7f170e525000-7f170e529000 r--p 001e7000 08:24 399106                     /lib/x86_64-linux-gnu/libc-2.27.so
+		7f170e529000-7f170e52b000 rw-p 001eb000 08:24 399106                     /lib/x86_64-linux-gnu/libc-2.27.so
+		7f170e52b000-7f170e52f000 rw-p 00000000 00:00 0 
+		7f170e52f000-7f170e57f000 r-xp 00000000 08:24 928436                     /usr/lib/x86_64-linux-gnu/libsodium.so.23.1.0
+		7f170e57f000-7f170e77e000 ---p 00050000 08:24 928436                     /usr/lib/x86_64-linux-gnu/libsodium.so.23.1.0
+		7f170e77e000-7f170e77f000 r--p 0004f000 08:24 928436                     /usr/lib/x86_64-linux-gnu/libsodium.so.23.1.0
+		7f170e77f000-7f170e780000 rw-p 00050000 08:24 928436                     /usr/lib/x86_64-linux-gnu/libsodium.so.23.1.0
+		7f170e780000-7f170ea1b000 r-xp 00000000 08:24 945680                     /usr/lib/x86_64-linux-gnu/libcrypto.so.1.1
+		7f170ea1b000-7f170ec1a000 ---p 0029b000 08:24 945680                     /usr/lib/x86_64-linux-gnu/libcrypto.so.1.1
+		7f170ec1a000-7f170ec46000 r--p 0029a000 08:24 945680                     /usr/lib/x86_64-linux-gnu/libcrypto.so.1.1
+		7f170ec46000-7f170ec48000 rw-p 002c6000 08:24 945680                     /usr/lib/x86_64-linux-gnu/libcrypto.so.1.1
+		7f170ec48000-7f170ec4b000 rw-p 00000000 00:00 0 
+		7f170ec4b000-7f170eccb000 r-xp 00000000 08:24 945681                     /usr/lib/x86_64-linux-gnu/libssl.so.1.1
+		7f170eccb000-7f170eecb000 ---p 00080000 08:24 945681                     /usr/lib/x86_64-linux-gnu/libssl.so.1.1
+		7f170eecb000-7f170eed4000 r--p 00080000 08:24 945681                     /usr/lib/x86_64-linux-gnu/libssl.so.1.1
+		7f170eed4000-7f170eed8000 rw-p 00089000 08:24 945681                     /usr/lib/x86_64-linux-gnu/libssl.so.1.1
+		7f170eed8000-7f170f08e000 r-xp 00000000 08:24 920434                     /usr/lib/x86_64-linux-gnu/libxml2.so.2.9.4
+		7f170f08e000-7f170f28e000 ---p 001b6000 08:24 920434                     /usr/lib/x86_64-linux-gnu/libxml2.so.2.9.4
+		7f170f28e000-7f170f296000 r--p 001b6000 08:24 920434                     /usr/lib/x86_64-linux-gnu/libxml2.so.2.9.4
+		7f170f296000-7f170f298000 rw-p 001be000 08:24 920434                     /usr/lib/x86_64-linux-gnu/libxml2.so.2.9.4
+		7f170f298000-7f170f299000 rw-p 00000000 00:00 0 
+		7f170f299000-7f170f29c000 r-xp 00000000 08:24 399129                     /lib/x86_64-linux-gnu/libdl-2.27.so
+		7f170f29c000-7f170f49b000 ---p 00003000 08:24 399129                     /lib/x86_64-linux-gnu/libdl-2.27.so
+		7f170f49b000-7f170f49c000 r--p 00002000 08:24 399129                     /lib/x86_64-linux-gnu/libdl-2.27.so
+		7f170f49c000-7f170f49d000 rw-p 00003000 08:24 399129                     /lib/x86_64-linux-gnu/libdl-2.27.so
+		7f170f49d000-7f170f63a000 r-xp 00000000 08:24 399169                     /lib/x86_64-linux-gnu/libm-2.27.so
+		7f170f63a000-7f170f839000 ---p 0019d000 08:24 399169                     /lib/x86_64-linux-gnu/libm-2.27.so
+		7f170f839000-7f170f83a000 r--p 0019c000 08:24 399169                     /lib/x86_64-linux-gnu/libm-2.27.so
+		7f170f83a000-7f170f83b000 rw-p 0019d000 08:24 399169                     /lib/x86_64-linux-gnu/libm-2.27.so
+		7f170f83b000-7f170f8ab000 r-xp 00000000 08:24 399228                     /lib/x86_64-linux-gnu/libpcre.so.3.13.3
+		7f170f8ab000-7f170faab000 ---p 00070000 08:24 399228                     /lib/x86_64-linux-gnu/libpcre.so.3.13.3
+		7f170faab000-7f170faac000 r--p 00070000 08:24 399228                     /lib/x86_64-linux-gnu/libpcre.so.3.13.3
+		7f170faac000-7f170faad000 rw-p 00071000 08:24 399228                     /lib/x86_64-linux-gnu/libpcre.so.3.13.3
+		7f170faad000-7f170fac9000 r-xp 00000000 08:24 399280                     /lib/x86_64-linux-gnu/libz.so.1.2.11
+		7f170fac9000-7f170fcc8000 ---p 0001c000 08:24 399280                     /lib/x86_64-linux-gnu/libz.so.1.2.11
+		7f170fcc8000-7f170fcc9000 r--p 0001b000 08:24 399280                     /lib/x86_64-linux-gnu/libz.so.1.2.11
+		7f170fcc9000-7f170fcca000 rw-p 0001c000 08:24 399280                     /lib/x86_64-linux-gnu/libz.so.1.2.11
+		7f170fcca000-7f170fce1000 r-xp 00000000 08:24 399245                     /lib/x86_64-linux-gnu/libresolv-2.27.so
+		7f170fce1000-7f170fee1000 ---p 00017000 08:24 399245                     /lib/x86_64-linux-gnu/libresolv-2.27.so
+		7f170fee1000-7f170fee2000 r--p 00017000 08:24 399245                     /lib/x86_64-linux-gnu/libresolv-2.27.so
+		7f170fee2000-7f170fee3000 rw-p 00018000 08:24 399245                     /lib/x86_64-linux-gnu/libresolv-2.27.so
+		7f170fee3000-7f170fee5000 rw-p 00000000 00:00 0 
+		7f170fee5000-7f170feed000 r-xp 00000000 08:24 928399                     /usr/lib/x86_64-linux-gnu/libargon2.so.0
+		7f170feed000-7f17100ec000 ---p 00008000 08:24 928399                     /usr/lib/x86_64-linux-gnu/libargon2.so.0
+		7f17100ec000-7f17100ed000 r--p 00007000 08:24 928399                     /usr/lib/x86_64-linux-gnu/libargon2.so.0
+		7f17100ed000-7f17100ee000 rw-p 00008000 08:24 928399                     /usr/lib/x86_64-linux-gnu/libargon2.so.0
+		7f17100ee000-7f1710115000 r-xp 00000000 08:24 399078                     /lib/x86_64-linux-gnu/ld-2.27.so
+		7f1710228000-7f1710271000 rw-p 00000000 00:00 0 
+		7f1710296000-7f17102f1000 rw-p 00000000 00:00 0 
+		7f1710305000-7f1710315000 rw-p 00000000 00:00 0 
+		7f1710315000-7f1710316000 r--p 00027000 08:24 399078                     /lib/x86_64-linux-gnu/ld-2.27.so
+		7f1710316000-7f1710317000 rw-p 00028000 08:24 399078                     /lib/x86_64-linux-gnu/ld-2.27.so
+		7f1710317000-7f1710318000 rw-p 00000000 00:00 0 
+		7ffee59f8000-7ffee5a19000 rw-p 00000000 00:00 0                          [stack]
+		7ffee5b8e000-7ffee5b91000 r--p 00000000 00:00 0                          [vvar]
+		7ffee5b91000-7ffee5b93000 r-xp 00000000 00:00 0                          [vdso]
+		ffffffffff600000-ffffffffff601000 r-xp 00000000 00:00 0                  [vsyscall]
+	`
+	const maps = mapsStr.trim().split("\n").map(line => {
+		const [address, perms, offset, dev, inode, pathname] = line.trim().split(/\s+/)
+		const [from, to] = address.split("-").map(addr => parseInt(addr, 16))
+		const size = to - from
+		return { address, from, to, size, pages: size / 4096, offset, dev, inode, pathname }
+	})
+	
+	const regions = [], maxGapSize = 1 * 1024**2
+	let prevEnd = 0, usedPageCount = 0
+	for (const map of maps) {
+		const gapSize = Math.min(map.from - prevEnd, maxGapSize)
+		if (gapSize > 0) {
+			regions.push({ startPage: usedPageCount, pageCount: Math.ceil(gapSize / 4096), map: null, color: [196, 196, 196] })
+			usedPageCount += Math.ceil(gapSize / 4096)
+		}
+		regions.push({ startPage: usedPageCount, pageCount: Math.ceil(map.size / 4096), map: map, color: hsl2rgb(rand(0, 359), rand(0.25, 0.5), rand(0.6, 0.8)) })
+		usedPageCount += Math.ceil(map.size / 4096)
+		prevEnd = map.to
+	}
+	regions.push({ startPage: usedPageCount, pageCount: Math.ceil(maxGapSize / 4096), map: null, color: [196, 196, 196] })
+	//regions.shift()  // remove the 1st empty region
+	
+	
+	//const totalGaps = regions.filter(r => r.map === null).reduce((sum, r) => sum + r.size, 0)
+	//const totalMaps = regions.filter(r => r.map !== null).reduce((sum, r) => sum + r.size, 0)
+	//const totalSize = regions.reduce((sum, r) => sum + r.size, 0)
+	//const totalPages = totalSize / 4096
+	//console.log(`totalMaps ${totalMaps / 1024**2}M, totalGaps ${totalGaps / 1024**2}M, ${(totalGaps / totalSize * 100).toFixed(1) }% gaps, totalSize ${totalSize} totalPages ${totalPages}`)
+	//
+	//// Number of sqares on a hilber curve: 4 ** level
+	//// Based on 4 ** level - 1 line segments on a curve, stated in "Introduction": https://www.bioconductor.org/packages/devel/bioc/vignettes/HilbertCurve/inst/doc/HilbertCurve.html
+	//// To get the level of the hilber curve: level = ceil( log base 4 of length )
+	//const hilberCurveLevel = Math.ceil(Math.log(totalPages) / Math.log(4))
+	//console.log(`hilberCurveLevel ${hilberCurveLevel}`)
+	
+	const totalPageCount = regions.reduce((sum, r) => sum + r.pageCount, 0)
+	
+	
+	let sqareSideLength = Math.sqrt(totalPageCount)
+	const hilbertBits = Math.ceil(Math.log2(sqareSideLength))
+	sqareSideLength = 2 ** hilbertBits  // round it up to the next power of 2
+	
+	const image = new ImageData(sqareSideLength, sqareSideLength)
+	for (const region of regions) {
+		for (let i = 0; i < region.pageCount; i++) {
+			const pageIndex = region.startPage + i
+			const [x, y] = decode(hilbertBits, pageIndex)
+			image.data[ (y*sqareSideLength + x) * 4 + 0] = region.color[0]
+			image.data[ (y*sqareSideLength + x) * 4 + 1] = region.color[1]
+			image.data[ (y*sqareSideLength + x) * 4 + 2] = region.color[2]
+			image.data[ (y*sqareSideLength + x) * 4 + 3] = 255
+		}
+	}
+	
+	const canvas = document.querySelector("canvas")
+	canvas.width = sqareSideLength
+	canvas.height = sqareSideLength
+	canvas.getContext('2d').putImageData(image, 0, 0)
+	
+	const tooltip = document.querySelector("div#tooltip")
+	canvas.addEventListener('mousemove', event => {
+		const pageIndex = encode(hilbertBits, [event.offsetX, event.offsetY])
+		const region = regions.find(r => pageIndex >= r.startPage && pageIndex < r.startPage + r.pageCount)
+		
+		tooltip.style["transform"] = `translate(${event.clientX}px, ${event.clientY}px)`
+		if (region) {
+			tooltip.style.removeProperty("display")
+			if (region.map) {
+				tooltip.querySelector(".address").textContent = region.map.address
+				tooltip.querySelector(".pathname").textContent = region.map.pathname
+			} else {
+				tooltip.querySelector(".address").textContent = "empty"
+				tooltip.querySelector(".pathname").textContent = ""
+			}
+		} else {
+			tooltip.style["display"] = "none"
+		}
+	})
+</script>
