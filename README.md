@@ -4,6 +4,8 @@ process-map
 A linux tool to visualize the virtual memory of a process. Thread activity is drawn as small dots jumping around on the
 map (at the instructions they're executing). The map also shows public symbols from binaries and shared libraries.
 
+<img src=demo.jpg>
+
 Compiling and how to run
 ------------------------
 

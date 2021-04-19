@@ -1,5 +1,6 @@
 map
-demo.*
+demo.ogv
+demo.webm
 deps/include
 deps/lib
 deps/*.tar.gz
