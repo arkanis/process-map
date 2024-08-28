@@ -250,7 +250,7 @@ int main(int argc, char** argv) {
 					DrawTexture(mapTexture, 0, 0, BLANK);
 				EndShaderMode();
 				
-				if (selectedRange) {
+				if (selectedRange && selectedRange->label.boundingBox.width < viewBoundingBox.width / 2) {
 					BeginShaderMode(sdfFontShader);
 						DrawTextEx(mapLabelSdfFont, selectedRange->label.text, (Vector2){ selectedRange->label.boundingBox.x, selectedRange->label.boundingBox.y }, selectedRange->label.fontSize, 0, BLACK);
 					EndShaderMode();
@@ -260,9 +260,11 @@ int main(int argc, char** argv) {
 				for (size_t i = 0; i < rangeCount; i++) {
 					AddrRange* range = &ranges[i];
 					if ( CheckCollisionRecs(range->boundingBox, viewBoundingBox) ) {
-						BeginShaderMode(sdfFontShader);
-							DrawTextEx(mapLabelSdfFont, range->label.text, (Vector2){ range->label.boundingBox.x, range->label.boundingBox.y }, range->label.fontSize, 0, (Color){ 0, 0, 0, 128 });
-						EndShaderMode();
+						if (range->boundingBox.width < viewBoundingBox.width / 2) {
+							BeginShaderMode(sdfFontShader);
+								DrawTextEx(mapLabelSdfFont, range->label.text, (Vector2){ range->label.boundingBox.x, range->label.boundingBox.y }, range->label.fontSize, 0, (Color){ 0, 0, 0, 128 });
+							EndShaderMode();
+						}
 						
 						if (range->boundingBox.width > viewBoundingBox.width / 4) {
 							BeginShaderMode(symbolMapShader);
