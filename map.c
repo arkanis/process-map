@@ -528,13 +528,23 @@ Texture2D PlotAddrRanges(AddrRange ranges[], size_t rangeCount, Font rangeNameFo
 		Color color;
 		if (ranges[i].isGap) {
 			uint32_t hash = fnv1a(&ranges[i], offsetof(AddrRange, isGap));
-			color = (Color){ .r = hash, .g = hash >> 8, .b = i, .a = 1 };
+			color = (Color){ .r = hash, .g = hash >> 8, .b = i, .a = 1 };  // 1 = gap
 		} else if (ranges[i].filePath) {
 			uint32_t hash = fnv1a(ranges[i].filePath, strlen(ranges[i].filePath));
-			color = (Color){ .r = hash, .g = hash >> 8, .b = i, .a = 2 };
+			color = (Color){ .r = hash, .g = hash >> 8, .b = i, .a = 2 };  // 2 = file backed range
 		} else {
 			uint32_t hash = fnv1a(&ranges[i], offsetof(AddrRange, isGap));
-			color = (Color){ .r = hash, .g = hash >> 8, .b = i, .a = 3 };
+			color = (Color){ .r = hash, .g = hash >> 8, .b = i, .a = 3 };  // 3 = anonymous range
+		}
+		
+		if (ranges[i].perms) {
+			if (ranges[i].perms[2] == 'x') {
+				color.a = 4;  // 4 = executable range
+			} else if (ranges[i].perms[1] == 'w') {
+				color.a = 5;  // 5 = writable range
+			} else if (ranges[i].perms[0] == 'r') {
+				color.a = 6;  // 6 = readable range
+			}
 		}
 		
 		int xMin = mapSideLength, xMax = 0, yMin = mapSideLength, yMax = 0;
