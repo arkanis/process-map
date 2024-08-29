@@ -26,6 +26,8 @@
 const size_t pageSize = 4096;
 const size_t cappedGapPageCount = (16 * 1024*1024) / 4096;
 const size_t particleCount = 2000;
+const float  mmapLabelMaxWindowFraction = 1.0 / 3.0;  // Labels for memory maps are hidden as soon as they're larger than that fraction of the window width
+const float  mmapDetailsMinWindowFraction = 1.0 / 4.0;  // The symbols within a memory map are shown as soon as it becomes larger than that fraction of the window width
 
 
 typedef struct {
@@ -250,7 +252,7 @@ int main(int argc, char** argv) {
 					DrawTexture(mapTexture, 0, 0, BLANK);
 				EndShaderMode();
 				
-				if (selectedRange && selectedRange->label.boundingBox.width < viewBoundingBox.width / 2) {
+				if (selectedRange && selectedRange->label.boundingBox.width < viewBoundingBox.width * mmapLabelMaxWindowFraction) {
 					BeginShaderMode(sdfFontShader);
 						DrawTextEx(mapLabelSdfFont, selectedRange->label.text, (Vector2){ selectedRange->label.boundingBox.x, selectedRange->label.boundingBox.y }, selectedRange->label.fontSize, 0, BLACK);
 					EndShaderMode();
@@ -260,13 +262,13 @@ int main(int argc, char** argv) {
 				for (size_t i = 0; i < rangeCount; i++) {
 					AddrRange* range = &ranges[i];
 					if ( CheckCollisionRecs(range->boundingBox, viewBoundingBox) ) {
-						if (range->boundingBox.width < viewBoundingBox.width / 2) {
+						if (range->boundingBox.width < viewBoundingBox.width * mmapLabelMaxWindowFraction) {
 							BeginShaderMode(sdfFontShader);
 								DrawTextEx(mapLabelSdfFont, range->label.text, (Vector2){ range->label.boundingBox.x, range->label.boundingBox.y }, range->label.fontSize, 0, (Color){ 0, 0, 0, 128 });
 							EndShaderMode();
 						}
 						
-						if (range->boundingBox.width > viewBoundingBox.width / 4) {
+						if (range->boundingBox.width > viewBoundingBox.width * mmapDetailsMinWindowFraction) {
 							BeginShaderMode(symbolMapShader);
 								DrawTexturePro(range->symbolMap, (Rectangle){ 0, 0, range->symbolMap.width, range->symbolMap.height }, range->boundingBox, (Vector2){ 0, 0 }, 0, (Color){0, 0, 0, 32});
 							EndShaderMode();
