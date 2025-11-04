@@ -24,7 +24,8 @@
 
 
 const size_t pageSize = 4096;
-const size_t cappedGapPageCount = (16 * 1024*1024) / 4096;
+const size_t cappedGapPageCount = (128 * 1024*1024) / 4096;
+const size_t cappedGapRoundingMultipleInPages = (16 * 1024*1024) / 4096;  // Left-over space is distributed to the capped memory gaps, then rounded down to multiples of this number to avoid jagged edges on the map.
 const size_t particleCount = 2000;
 const float  mmapLabelMaxWindowFraction = 1.0 / 3.0;  // Labels for memory maps are hidden as soon as they're larger than that fraction of the window width
 const float  mmapDetailsMinWindowFraction = 1.0 / 4.0;  // The symbols within a memory map are shown as soon as it becomes larger than that fraction of the window width
@@ -499,10 +500,11 @@ Texture2D PlotAddrRanges(AddrRange ranges[], size_t rangeCount, Font rangeNameFo
 			// Make sure the end of the last range aligns with the end of the map
 			ranges[i].endPage = mapSideLength*mapSideLength;
 		} else if (ranges[i].isGap && rangePageCount > cappedGapPageCount) {
-			rangePageCount = cappedGapPageCount + leftOverFreePages * ((double)rangePageCount / oversizedGapPages);
+			rangePageCount = cappedGapPageCount + leftOverFreePages * (double)rangePageCount / oversizedGapPages;
 			ranges[i].endPage = ranges[i].startPage + rangePageCount;
-			// Round the endPage towards to the closest 16M boundary to avoid jagged edges on the map 
-			ranges[i].endPage = (ranges[i].endPage + cappedGapPageCount / 2) / cappedGapPageCount * cappedGapPageCount;
+			// Round the endPage down towards a nice boundary (e.g. 16M or 8M) to avoid jagged edges on the map.
+			// We rely on integer division rounding down here (at least for positive numbers).
+			ranges[i].endPage = (ranges[i].endPage / cappedGapRoundingMultipleInPages) * cappedGapRoundingMultipleInPages;
 		} else {
 			ranges[i].endPage = ranges[i].startPage + rangePageCount;
 		}
