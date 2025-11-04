@@ -1,8 +1,12 @@
 # -Wno-unused-parameter is needed for raygui.h
-CFLAGS = -std=c99 -Wall -Wextra -Werror -Wno-unused-parameter
+CFLAGS = -std=c99 -g -Wall -Wextra -Werror -Wno-unused-parameter
 CPPFLAGS = -I deps/include
 LDLIBS += -lGL -lm -lpthread -ldl -lrt -lX11
 
+ifdef DEBUG
+	CC = clang-15
+	CFLAGS += -g -Wno-unused-but-set-variable -Wno-unused-variable
+endif
 
 map: deps/lib/libraylib.a
 
