@@ -1,6 +1,8 @@
 map
 demo.ogv
 demo.webm
+demo.png
 deps/include
 deps/lib
 deps/*.tar.gz
+.vscode
