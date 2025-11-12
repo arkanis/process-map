@@ -23,9 +23,10 @@
 #include "deps/raygui.h"
 
 
-const size_t pageSize = 4096;
-const size_t cappedGapPageCount = (128 * 1024*1024) / 4096;
-const size_t cappedGapRoundingMultipleInPages = (16 * 1024*1024) / 4096;  // Left-over space is distributed to the capped memory gaps, then rounded down to multiples of this number to avoid jagged edges on the map.
+#define VIEW_PAGE_SIZE (4096*16)
+const size_t pageSize = VIEW_PAGE_SIZE;
+const size_t cappedGapPageCount = (128 * 1024*1024) / VIEW_PAGE_SIZE;
+const size_t cappedGapRoundingMultipleInPages = (16 * 1024*1024) / VIEW_PAGE_SIZE;  // Left-over space is distributed to the capped memory gaps, then rounded down to multiples of this number to avoid jagged edges on the map.
 const size_t particleCount = 2000;
 const float  mmapLabelMaxWindowFraction = 1.0 / 3.0;  // Labels for memory maps are hidden as soon as they're larger than that fraction of the window width
 const float  mmapDetailsMinWindowFraction = 1.0 / 4.0;  // The symbols within a memory map are shown as soon as it becomes larger than that fraction of the window width
