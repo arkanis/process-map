@@ -109,14 +109,22 @@ double HumanReadableByteSize(size_t bytes, const char** unit);
 
 
 int main(int argc, char** argv) {
-	if (argc != 2) {
-		fprintf(stderr, "usage: %s pid\n", argv[0]);
+	bool showElfSymbols = true;
+	char* pidString = NULL;
+	if (argc == 2) {
+		pidString = argv[1];
+	} else if (argc == 3 && strcmp(argv[1], "-ns") == 0) {
+		showElfSymbols = false;
+		pidString = argv[2];
+	} else {
+		fprintf(stderr, "usage: %s [-sn] pid\n", argv[0]);
+		fprintf(stderr, "-sn shows no ELF symbols\n");
 		return 0;
 	}
 	
-	FILE* cmdLineFile = fopen(TextFormat("/proc/%s/cmdline", argv[1]), "rb");
+	FILE* cmdLineFile = fopen(TextFormat("/proc/%s/cmdline", pidString), "rb");
 	if (cmdLineFile == NULL) {
-		fprintf(stderr, "Couldn't find process %s\n", argv[1]);
+		fprintf(stderr, "Couldn't find process %s\n", pidString);
 		return 0;
 	}
 	char* cmdLine = NULL;
@@ -125,9 +133,9 @@ int main(int argc, char** argv) {
 	
 	int screenWidth = 800, screenHeight = 600;
 	SetConfigFlags(FLAG_VSYNC_HINT | FLAG_WINDOW_RESIZABLE);
-	InitWindow(screenWidth, screenHeight, TextFormat("Memory map of process %s: %s", argv[1], cmdLine));
+	InitWindow(screenWidth, screenHeight, TextFormat("Memory map of process %s: %s", pidString, cmdLine));
 	
-	Font uiFont      = LoadFontEx("NotoSans-Regular.ttf", 16, NULL, 0);
+	Font uiFont          = LoadFontEx("NotoSans-Regular.ttf", 16, NULL, 0);
 	Font mapLabelSdfFont = LoadSdfFont("NotoSans-Regular.ttf");
 	Shader sdfFontShader = LoadShader(NULL, "sdf-text.fs");
 	
@@ -135,16 +143,17 @@ int main(int argc, char** argv) {
 	
 	AddrRange* ranges = NULL;
 	size_t rangeCount = 0;
-	LoadAddrRanges(argv[1], &ranges, &rangeCount);
+	LoadAddrRanges(pidString, &ranges, &rangeCount);
 	size_t hilbertCurveOrder = 0;
 	Texture2D mapTexture = PlotAddrRanges(ranges, rangeCount, mapLabelSdfFont, &hilbertCurveOrder);
-	PlotRangeElfSymbols(ranges, rangeCount, hilbertCurveOrder, mapLabelSdfFont);
+	if (showElfSymbols)
+		PlotRangeElfSymbols(ranges, rangeCount, hilbertCurveOrder, mapLabelSdfFont);
 	
 	Shader mapShader = LoadShader(NULL, "range-map2.fs");
 	int selectedColorLoc = GetShaderLocation(mapShader, "selectedColor");
 	Shader symbolMapShader = LoadShader(NULL, "symbol-map.fs");
 	
-	TaskTraces traces = LoadTaskTraces(argv[1]);
+	TaskTraces traces = LoadTaskTraces(pidString);
 	
 	Camera2D camera = (Camera2D){
 		.target = (Vector2){ mapTexture.width / 2, mapTexture.height / 2 },
