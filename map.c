@@ -240,11 +240,11 @@ int main(int argc, char** argv) {
 				EndShaderMode();
 				DrawRectangle(lx, ly, 16, 16, (Color){ 229, 229, 229, 255 });
 				BeginShaderMode(sdfFontShader);
-					DrawTextEx(mapLabelSdfFont, "1 MiByte to scale",               (Vector2){ -200, ly }, 14, 0, BLACK); ly += 14 + 6;
+					DrawTextEx(mapLabelSdfFont, TextFormat("%.0f MiByte to scale", (16*16*VIEW_PAGE_SIZE) / (1024*1024.0f)),  (Vector2){ -200, ly }, 14, 0, BLACK); ly += 14 + 6;
 				EndShaderMode();
 				DrawRectangle(lx - (64-16), ly, 64, 64, (Color){ 229, 229, 229, 255 });
 				BeginShaderMode(sdfFontShader);
-					DrawTextEx(mapLabelSdfFont, "16 MiByte to scale",              (Vector2){ -200, ly }, 14, 0, BLACK); ly += 14 + 6;
+					DrawTextEx(mapLabelSdfFont, TextFormat("%.0f MiByte to scale", (64*64*VIEW_PAGE_SIZE) / (1024*1024.0f)),  (Vector2){ -200, ly }, 14, 0, BLACK); ly += 14 + 6;
 				EndShaderMode();
 				
 				// Draw map and highlight selected range
