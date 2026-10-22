@@ -536,7 +536,9 @@ Texture2D PlotAddrRanges(AddrRange ranges[], size_t rangeCount, Font rangeNameFo
 	// While we iterate over each pixel of a range also calculate the bounding box for later (text positioning, draw culling, etc.).
 	Image mapImage = GenImageColor(mapSideLength, mapSideLength, BLANK);
 	Color* mapImagePixels = mapImage.data;
+	printf("plot range count: %zu\n", rangeCount);
 	for (size_t i = 0; i < rangeCount; i++) {
+		printf("plotting range %zu: 0x%016zx - 0x%016zx, %s\n", i, ranges[i].startAddr, ranges[i].endAddr, ranges[i].filePath);
 		Color color;
 		if (ranges[i].isGap) {
 			uint32_t hash = fnv1a(&ranges[i], offsetof(AddrRange, isGap));
