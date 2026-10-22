@@ -279,7 +279,23 @@ int main(int argc, char** argv) {
 					if ( CheckCollisionRecs(range->boundingBox, viewBoundingBox) ) {
 						if (range->boundingBox.width < viewBoundingBox.width * mmapLabelMaxWindowFraction) {
 							BeginShaderMode(sdfFontShader);
-								DrawTextEx(mapLabelSdfFont, range->label.text, (Vector2){ range->label.boundingBox.x, range->label.boundingBox.y }, range->label.fontSize, 0, (Color){ 0, 0, 0, 128 });
+								/*
+								// Ongoing experiment for issue "Enhancement Request - Reduction of Visible Clutter": https://github.com/arkanis/process-map/issues/3
+								float inverseScale = 1.0 / camera.zoom;
+								float logFontSize = logf(range->label.fontSize) / logf(10), logInverseScale = logf(camera.zoom) / logf(10);
+								float logMaxDistWithFullAlpha = 1.0, logTransitionDistToZeorAlpha = 0.3;
+								float unclampedAlpha = (fabsf(logInverseScale - logFontSize - 1.14f) - logMaxDistWithFullAlpha) * (logTransitionDistToZeorAlpha / -1.0);
+								float alpha = fmaxf(0.0, fminf(unclampedAlpha, 1.0));
+								Color labelColor = (Color){ 0, 0, 0, 255*alpha };
+								if (i == 2) {
+									printf("label %s: inverseScale %f fontSize %f logFontSize %f logInverseScale %f\n", 
+										range->label.text, inverseScale, range->label.fontSize,
+										logFontSize, logInverseScale
+									);
+								}
+								*/
+								Color labelColor = (Color){ 0, 0, 0, 128 };
+								DrawTextEx(mapLabelSdfFont, range->label.text, (Vector2){ range->label.boundingBox.x, range->label.boundingBox.y }, range->label.fontSize, 0, labelColor);
 							EndShaderMode();
 						}
 						
