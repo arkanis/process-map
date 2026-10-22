@@ -23,7 +23,11 @@
 #include "deps/raygui.h"
 
 
-#define VIEW_PAGE_SIZE (4096*16)
+// 1px in world space equals 1 4k page
+#define VIEW_PAGE_SIZE 4096
+// Smaller scale. Needed to display chrome because otherwise too large textures break something. But also breaks positioning and labels of regions that become smaller than 1px.
+//#define VIEW_PAGE_SIZE (4096*16)
+
 const size_t pageSize = VIEW_PAGE_SIZE;
 const size_t cappedGapPageCount = (128 * 1024*1024) / VIEW_PAGE_SIZE;
 const size_t cappedGapRoundingMultipleInPages = (16 * 1024*1024) / VIEW_PAGE_SIZE;  // Left-over space is distributed to the capped memory gaps, then rounded down to multiples of this number to avoid jagged edges on the map.
