@@ -121,8 +121,8 @@ int main(int argc, char** argv) {
 		showElfSymbols = false;
 		pidString = argv[2];
 	} else {
-		fprintf(stderr, "usage: %s [-sn] pid\n", argv[0]);
-		fprintf(stderr, "-sn shows no ELF symbols\n");
+		fprintf(stderr, "usage: %s [-ns] pid\n", argv[0]);
+		fprintf(stderr, "-ns shows no ELF symbols\n");
 		return 0;
 	}
 	
